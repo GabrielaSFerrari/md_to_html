@@ -31,12 +31,16 @@ def eh_separador_tabela(colunas: list[str]) -> bool:
     )
 
 
-def extrair_faq(markdown_completo: str) -> list[tuple[str, str]]:
+def extrair_faq(
+    markdown_completo: str,
+) -> list[tuple[str, str, str]]:
     linhas = markdown_completo.splitlines()
-    itens: list[tuple[str, str]] = []
+    itens: list[tuple[str, str, str]] = []
 
+    indice_numero: int | None = None
     indice_pergunta: int | None = None
     indice_resposta: int | None = None
+
     esperando_separador = False
     dentro_tabela = False
 
@@ -51,13 +55,21 @@ def extrair_faq(markdown_completo: str) -> list[tuple[str, str]]:
 
         colunas = separar_linha_tabela(linha_limpa)
 
-        if indice_pergunta is None or indice_resposta is None:
+        if (
+            indice_numero is None
+            or indice_pergunta is None
+            or indice_resposta is None
+        ):
             cabecalhos = [
                 re.sub(r"\s+", " ", coluna).strip().casefold()
                 for coluna in colunas
             ]
 
-            if "pergunta" in cabecalhos and "resposta" in cabecalhos:
+            if all(
+                cabecalho in cabecalhos
+                for cabecalho in ("index", "pergunta", "resposta")
+            ):
+                indice_numero = cabecalhos.index("index")
                 indice_pergunta = cabecalhos.index("pergunta")
                 indice_resposta = cabecalhos.index("resposta")
                 esperando_separador = True
@@ -74,16 +86,27 @@ def extrair_faq(markdown_completo: str) -> list[tuple[str, str]]:
             dentro_tabela = True
             continue
 
-        maior_indice = max(indice_pergunta, indice_resposta)
+        maior_indice = max(
+            indice_numero,
+            indice_pergunta,
+            indice_resposta,
+        )
 
         if len(colunas) <= maior_indice:
             continue
 
+        numero = colunas[indice_numero].strip()
         pergunta = colunas[indice_pergunta].strip()
         resposta_markdown = colunas[indice_resposta].strip()
 
-        if pergunta and resposta_markdown:
-            itens.append((pergunta, resposta_markdown))
+        if numero and pergunta and resposta_markdown:
+            itens.append(
+                (
+                    pergunta,
+                    numero,
+                    resposta_markdown,
+                )
+            )
 
     return itens
 
@@ -171,10 +194,11 @@ def converter_faq(
 
     blocos: list[str] = []
 
-    for pergunta, resposta_markdown in itens:
+    for pergunta, numero, resposta_markdown in itens:
         resposta_html = markdown_para_html(resposta_markdown)
 
         blocos.append(
+            f"{numero}\n"
             f"{pergunta}\n"
             f"{resposta_html}"
         )
